@@ -1,0 +1,168 @@
+#include "SPI.h"
+#include "Adafruit_GFX.h"
+#include "Adafruit_ILI9341.h"
+
+#define TFT_CS     15 // @param    cs    Chip select pin #
+#define TFT_DC     33 // @param    dc    Data/Command pin # 
+#define TFT_MOSI   18 // @param    mosi  SPI MOSI pin #
+#define TFT_SCLK   5  // @param    sclk  SPI Clock pin #
+#define TFT_RST    4  // @param    rst   Reset pin # (optional, pass -1 if unused)
+#define TFT_MISO   19 // @param    miso  SPI MISO pin # (optional, pass -1 if unused)*/
+
+
+Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST, TFT_MISO);
+
+
+int xHCircle,  yHCircle, rHCricle;
+
+void setup() {
+  tft.begin();
+  tft.setRotation(1);
+  tft.fillScreen(ILI9341_BLACK);
+  tft.setTextColor(ILI9341_YELLOW, ILI9341_BLACK);
+
+  xHCircle = tft.width() / 4;
+  yHCircle = tft.height() / 4;
+  rHCricle = ((tft.height() / 4) - 10);
+
+  drawSeparatorLine();
+  drawCircleHeading();
+}
+
+
+float lastHeading = 0;
+int headingIdx = 0;
+double headingMeanSum = 0, lastHeadingMean = 0;
+float mainHeading = 60; //random(0, 36000) / 100.0;
+
+
+void loop() {
+
+
+  mainHeading = mainHeading  + (random(-1000, 1000) / 100.0);
+
+  float meanHeading = 0;
+  float mainSpeed = random(0, 9900) / 100.0;
+
+
+  headingIdx++;
+  headingMeanSum = headingMeanSum + mainHeading;
+  meanHeading = headingMeanSum / headingIdx;
+
+
+  printMainSpeed(mainSpeed);
+  printMainHeading(mainHeading, meanHeading);
+
+  drawHeadingLine(lastHeading, ILI9341_BLACK);
+  drawCircleHeading();
+  drawHeadingLine(mainHeading, ILI9341_GREEN);
+
+
+
+  drawHeadingLine(lastHeading, ILI9341_BLACK);
+  drawHeadingLine(lastHeadingMean, ILI9341_BLACK);
+  drawCircleHeading();
+  drawHeadingLine(mainHeading, ILI9341_YELLOW);
+  drawHeadingLine(meanHeading, ILI9341_RED);
+
+  lastHeadingMean = meanHeading;
+  lastHeading = mainHeading;
+
+  delay(500);
+}
+
+
+
+
+void printMainHeading(float heading, float meanHeading) {
+  char mainHeadingStr[8];
+  char mainHeadingStr_temp[6];
+  dtostrf(heading, 5, 1, mainHeadingStr_temp);
+  sprintf(mainHeadingStr, "%s%c", mainHeadingStr_temp, 247);
+
+  tft.setTextSize(4);
+  tft.setTextColor(ILI9341_YELLOW, ILI9341_BLACK);
+  tft.setCursor(tft.width() / 2, tft.height() / 4);
+  tft.print(mainHeadingStr);
+
+
+  char meanHeadingStr[8];
+  char meanHeadingStr_temp[10];
+  dtostrf(heading - meanHeading, 5, 1, meanHeadingStr_temp);
+  sprintf(meanHeadingStr, "%c %s%c", 127, meanHeadingStr_temp, 247);
+  tft.setTextSize(2);
+  tft.setTextColor( ILI9341_GREEN , ILI9341_BLACK);
+  tft.setCursor(tft.width() / 2, 0);
+  tft.print(meanHeadingStr);
+
+  dtostrf(meanHeading, 5, 1, meanHeadingStr_temp);
+  sprintf(meanHeadingStr, "%c %s%c", 211, meanHeadingStr_temp, 247);
+  tft.setTextSize(2);
+  tft.setTextColor(ILI9341_RED, ILI9341_BLACK);
+  tft.setCursor(tft.width() / 2, 15);
+  tft.print(meanHeadingStr);
+
+
+}
+
+void printMainSpeed(float mspeed) {
+  char meanSpeedStr[8];
+  char speedStr_temp[6];
+  dtostrf(mspeed, 5, 2, speedStr_temp);
+  sprintf(meanSpeedStr, "%sk", speedStr_temp );
+
+  tft.setTextSize(4);
+  tft.setTextColor(ILI9341_YELLOW, ILI9341_BLACK);
+  tft.setCursor(tft.width() / 2, (tft.height() / 4 + tft.height() / 2));
+  tft.print(meanSpeedStr);
+
+}
+
+
+
+void drawHeadingLine(float heading, uint16_t color) {
+  double x1, y1, x2, y2;
+  x1 = xHCircle;
+  y1 = yHCircle;
+
+  double rd = radians(heading) - (PI / 2);
+  x2 = (cos(rd) * rHCricle) + x1;
+  y2 = (sin(rd) * rHCricle) + y1;
+
+  tft.drawLine(x1, y1, x2, y2, color);
+
+  tft.setTextSize(1);
+  tft.setCursor(x2, (y2));
+
+
+  char meanHeadingStr[3];
+
+  dtostrf(heading, 3, 0, meanHeadingStr);
+  tft.setTextColor(color, ILI9341_BLACK);
+  tft.print(meanHeadingStr);
+}
+
+
+
+
+void drawSeparatorLine() {
+  int x1, y1, x2, y2;
+  x1 = 0;
+  y1 = tft.height() / 2;
+  x2 = tft.width();
+  y2 = tft.height() / 2;
+
+  uint16_t color = ILI9341_YELLOW;
+  tft.drawLine(x1, y1, x2, y2, color);
+}
+
+
+
+
+void drawCircleHeading() {
+  uint16_t color = ILI9341_BLUE;
+  tft.drawCircle(xHCircle, yHCircle, rHCricle, color);
+}
+
+
+
