@@ -1,0 +1,90 @@
+#include "SPI.h"
+#include "Adafruit_GFX.h"
+#include "Adafruit_ILI9341.h"
+
+#define TFT_CS     15 // @param    cs    Chip select pin #
+#define TFT_DC     33 // @param    dc    Data/Command pin # 
+#define TFT_MOSI   18 // @param    mosi  SPI MOSI pin #
+#define TFT_SCLK   5  // @param    sclk  SPI Clock pin #
+#define TFT_RST    4  // @param    rst   Reset pin # (optional, pass -1 if unused)
+#define TFT_MISO   19 // @param    miso  SPI MISO pin # (optional, pass -1 if unused)*/
+
+
+Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST, TFT_MISO);
+
+
+int xHCircle,  yHCircle, rHCricle;
+
+void setup() {
+  tft.begin();
+  tft.setRotation(3);
+  tft.fillScreen(ILI9341_BLACK);
+  tft.setTextColor(ILI9341_YELLOW, ILI9341_BLACK);
+  tft.setTextSize(2); //  1 = 5x8, 2 = 10x16; chars leave blank pixel on bottom 
+}
+
+// text size 1 "0123456789abcdef0123456789" » 16 lines of 0x20 (decimal 26) characters
+// text size 2 "0123456789abc" » 8 lines of 13 characters
+
+int page=0;
+int i=0;
+int lastpage=1; // make different for 1st time thru loop()
+// used initializer to make the string long enough!
+char lineText[0x22]="0x--- 0123 4567 89ab cdef\n";  
+
+void loop() {
+  char text[512];
+  char fBuffer[10];
+  float position;
+  int _char=page*15*0x10;
+  // 0x12 = up+down arrow in once character
+  // 0x18 = up arrow  0x1e = up arrow solid
+  // 0x19 = down arr  0x1f = down arr solid
+  // diameter = 0xec
+  // identity, equality = 0xef
+  // left arrow quote = 0xae, r arrow quote » = 0xaf
+  // 0x413 is double exclamation!
+  // tft.setTextWrap(false);
+  if( page != lastpage ){
+    tft.fillScreen(ILI9341_BLACK);
+    tft.setCursor(0,0);
+    // print header
+    tft.setTextColor(ILI9341_BLUE);
+    sprintf( fBuffer, "pg %-4d", page+1); // page 0 doesn't make sense...
+    sprintf( lineText, "%6.6s 0123 4567 89ab cdef", fBuffer );
+    tft.print(lineText);
+    for( int line=0 ; line <= 15; line++ ) {
+      if(_char%0x100 == 0 ) { // skip first rows of each char set
+          tft.setTextColor(ILI9341_RED);
+          sprintf( fBuffer, "%#x", _char);
+          sprintf( lineText, "%6.6s %c skip row with \\n ", fBuffer, 0x19 );
+          tft.print(lineText);
+          _char += 0x10;
+        continue;
+      }
+      tft.setTextColor(ILI9341_BLUE);
+      sprintf( fBuffer, "%#x", _char);
+      // sprintf( lineText, "%6.6s 0123 4567 89ab cdef\n", fBuffer );
+      sprintf( lineText, "%6.6s", fBuffer );
+      tft.print(lineText);
+      tft.setTextColor(ILI9341_WHITE);
+      for( int block=0; block<4; block++){
+        sprintf( lineText, " %c%c%c%c"
+          , _char 
+          , _char+1 
+          , _char+2 
+          , _char+3 
+          );
+        _char+=4;
+        tft.print(lineText);
+      }
+      
+      
+    }
+    lastpage=page;  
+  }
+
+  delay(1000);
+  i++;
+  page=i%2;
+}
