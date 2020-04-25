@@ -562,7 +562,8 @@ void SUB_DISPLAY_COURSE ()
       tft.print(CONVERTED);                                /* Display value */
       tft.print(UNITDEG);
 
-
+      tft.setCursor(25, 185);                                /* Clear cardinal info */
+      tft.print("   ");                                      /* Clear cardinal placeholder */
       tft.setCursor(25, 185);                                /* Display cardinal info */
       tft.print(gps.cardinal(gps.course.deg()) + String("  "));
     }
@@ -583,11 +584,6 @@ void SUB_DISPLAY_COURSE ()
     COURSE_FAIL_UPDATE = false;                                  /* Set altitude update false */
   }
 }
-
-
-
-
-
 
 
 /****************************************************************************************/
