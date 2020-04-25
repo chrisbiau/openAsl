@@ -24,9 +24,6 @@ const char * host = "jeedom.legoff.ovh";
 const int port = 10111;
 
 
-
-
-
 Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST, TFT_MISO);
 
 /* Constants */
@@ -37,19 +34,18 @@ const byte UTC_CET = 2;                                       /* Time difference
 
 
 TinyGPSPlus gps;                                              /* Reference the TinyGPS++ object */
-HardwareSerial GPSRaw(2);                                     /* By default, GPS is connected with M5Core through UART2 */
 
 /* Variables */
 boolean UPDATE_FLAG;                                          /* Display update flag: TRUE = Update, FALSE = No update */
 boolean LOC_UPDATE_FLAG;                                      /* Location update flag: TRUE = Update, FALSE = No update */
 boolean ALT_UPDATE_FLAG;                                      /* Altitude update flag: TRUE = Update, FALSE = No update */
+boolean COURSE_UPDATE_FLAG;                                   /* Course update flag: TRUE = Update, FALSE = No update */
 boolean SPEED_UPDATE_FLAG;                                    /* Speed update flag: TRUE = Update, FALSE = No update */
 boolean SAT_UPDATE_FLAG;                                      /* Nr. of sattelites update flag: TRUE = Update, FALSE = No update */
 boolean HDOP_UPDATE_FLAG;                                     /* HDOP update flag: TRUE = Update, FALSE = No update */
 byte LOOP_COUNTER;                                            /* Generic loop counter for delay */
 byte DELAY_CHECK = 0;                                         /* Delay to check if any data received */
 byte LCD_BRIGHTNESS = 250;                                    /* LCD brightness value (0-250) */
-byte MENU_LANGUAGE = 1;                                       /* Menu Language 0 = German, 1 = English */
 byte GPS_FORMAT = 0;                                          /* GPS format 0 = Decimal degree, 1= Degree, Minutes, Seconds */
 byte GPS_STATUS;                                              /* GPS status: 0 = No GPS receiver detected, 1 = No valid GPS fix, 2 = Valid GPS data */
 unsigned int NO_OF_SAT;                                       /* Number of satellites */
@@ -59,6 +55,7 @@ unsigned int OLD_NO_OF_SAT;                                   /* Old number of s
 unsigned int OLD_HDOP;                                        /* Old HDOP value */
 int OLD_SEC = 0;                                              /* Old second */
 int OLD_ALTITUDE;                                             /* Old altitude value */
+int OLD_COURSE;                                               /* Old course value */
 int OLD_SPEED;                                                /* Old speed value */
 float OLD_LOC_LAT;                                            /* Old lateral location */
 float OLD_LOC_LNG;                                            /* Old longitudinal location */
@@ -78,7 +75,6 @@ void setup() {
   // Initilize hardware serial:
   Serial.begin(115200);
 
-
   tft.begin();
   tft.setRotation(1);
   tft.fillScreen(ILI9341_BLACK);              /* Set initial LCD brightness */
@@ -86,7 +82,6 @@ void setup() {
   delay (2000);                                               /* 2000ms init delay */
   UPDATE_FLAG = true;                                         /* Set update flag true */
   LOC_UPDATE_FLAG = true;                                     /* Set location update flag true */
-
 
   //Connect to the WiFi network
   connectToWiFi(networkName, networkPswd);
@@ -123,11 +118,13 @@ void loop() {
 
 
   Serial.println(line);
-  char *p = const_cast<char*>(line.c_str());
+  char *gpsStream = const_cast<char*>(line.c_str());
 
+  while (*gpsStream)
+    if (gps.encode(*gpsStream++))
 
-  gps.encode(*p);
-  displayInfo();
+      //sgps.encode(*p++);
+      displayInfo();
 
   CHARS_PROCESSED = gps.charsProcessed();                     /* Read processed chars */
 
@@ -195,6 +192,7 @@ void loop() {
       UPDATE_FLAG = true;                                     /* Set display update flag true */
       LOC_UPDATE_FLAG = true;                                 /* Set location update flag true */
       ALT_UPDATE_FLAG = true;                                 /* Set altitude update flag true */
+      COURSE_UPDATE_FLAG = true;                              /* Set course update flag true */
       SPEED_UPDATE_FLAG = true;                               /* Set speed update flag true */
       SAT_UPDATE_FLAG = true;                                 /* Set number of sattelites update flag true */
       HDOP_UPDATE_FLAG = true;                                /* Set HDOP update flag true */
@@ -228,7 +226,8 @@ void loop() {
 
       SUB_DISPLAY_DATE_TIME();                                /* Call sub routine to display time and date info */
       SUB_DISPLAY_LOCATION();                                 /* Call sub routine to display location */
-      SUB_DISPLAY_ALTITUDE();                                 /* Call sub routine to display altitude */
+      //SUB_DISPLAY_ALTITUDE();                                 /* Call sub routine to display altitude */
+      SUB_DISPLAY_COURSE();                                    /* Call sub routine to display course */
       SUB_DISPLAY_SPEED();                                    /* Call sub routine to display speed */
       SUB_DISPLAY_SAT();                                      /* Call sub routine to display number of sattelites */
       SUB_DISPLAY_HDOP();                                     /* Call sub routine to display HDOP value */
@@ -237,18 +236,6 @@ void loop() {
 
   OLD_CHARS_PROCESSED = CHARS_PROCESSED;
 
-
-
-
-
-
-
-
-
-
-
-
-  //delay(20);
 }
 
 void connectToWiFi(const char * ssid, const char * pwd) {
@@ -393,16 +380,11 @@ void SUB_DISPLAY_DATE_TIME ()
     sprintf(CONVERTED, "%02d:%02d:%02d ", ACT_HOUR, ACT_MIN, ACT_SEC);
     tft.print(CONVERTED);                                  /* Display converted time string */
     tft.setCursor(190, 219);                               /* Position cursor to display date */
-    if (MENU_LANGUAGE == 0)                                   /* German language chosen ? */
-    {
-      /* Convert into dispaly string */
-      sprintf(CONVERTED, "%02d.%02d.%02d ", ACT_DAY, ACT_MONTH, ACT_YEAR);
-    }
-    else                                                      /*Englishn language chosen ? */
-    {
-      /* Convert into dispaly string */
-      sprintf(CONVERTED, "%02d/%02d/%02d ", ACT_YEAR, ACT_MONTH, ACT_DAY);
-    }
+
+    /* Convert into dispaly string */
+    sprintf(CONVERTED, "%02d.%02d.%02d ", ACT_DAY, ACT_MONTH, ACT_YEAR);
+
+
     tft.print(CONVERTED);                                  /* Display converted date string */
   }
 
@@ -415,14 +397,10 @@ void SUB_DISPLAY_DATE_TIME ()
       tft.setTextSize(2);                                  /* Set text size to 2 */
       tft.print(F("--:--:--"));                            /* Dispaly time placeholder */
       tft.setCursor(190, 219);                             /* Position cursor to display date */
-      if (MENU_LANGUAGE == 0)                                 /* German language chosen ? */
-      {
-        tft.print(F("--.--.----"));                        /* Display date placeholder */
-      }
-      else                                                    /*Englishn language chosen ? */
-      {
-        tft.print(F("----/--/--"));                        /* Display date placeholder */
-      }
+
+      tft.print(F("--/--/----"));                        /* Display date placeholder */
+
+
       TIME_DATE_UPDATE = false;                               /* Set date update false */
     }
   }
@@ -536,6 +514,80 @@ void SUB_DISPLAY_LOCATION ()
     LOC_FAIL_UPDATE = false;                                  /* Set date update false */
   }
 }
+
+
+
+/****************************************************************************************/
+/* SUBROUTINE Display Course                                                          */
+/* This subroutine displays the course information                                    */
+/****************************************************************************************/
+
+
+
+void SUB_DISPLAY_COURSE ()
+{
+
+
+  boolean COURSE_FAIL_UPDATE;                                    /* True = Needs update, False = Needs no update */
+  float ACT_COURSE;                                         /* Actual laltitude value */
+  int INTEGER_VAL;                                            /* Integer value */
+  int STRING_LENGTH;                                          /* Length of string */
+
+  COURSE_FAIL_UPDATE = false;                                    /* No update needed */
+  char UNITDEG[1];
+  sprintf(UNITDEG, "%c", 247);
+  if (gps.course.isValid() == true)                         /* Valid GPS course received ? */
+  {
+    COURSE_FAIL_UPDATE = true;                                   /* Update needed */
+    tft.setTextSize(3);                                    /* Set text size to 3 */
+    ACT_COURSE = gps.course.deg();                     /* Get course value */
+
+    /* Display altitude value */
+    INTEGER_VAL = (int)(ACT_COURSE);                        /* Extract integer value of altitude variable */
+    sprintf(CONVERTED, "%.1f", ACT_COURSE);                 /* Convert float to a string to determine length */
+    STRING_LENGTH = strlen(CONVERTED);                        /* Determine length of string */
+    /* Value has changed for updating display or location update flag true? */
+    if ((OLD_COURSE != INTEGER_VAL) || (COURSE_UPDATE_FLAG == true))
+    {
+      OLD_COURSE = INTEGER_VAL;                             /* Save value */
+      tft.fillRect(4, 145, 100, 40, 0x1E9F);               /* Clear old altitude value */
+      if (STRING_LENGTH >= 4)                                 /* String length >= 4 ? */
+        tft.setCursor(8, 155);                             /* Position cursor */
+      if (STRING_LENGTH == 3)                                 /* String length = 3 ? */
+        tft.setCursor(18, 155);                            /* Position cursor */
+      if (STRING_LENGTH == 2)                                 /* String length = 2 ? */
+        tft.setCursor(25, 155);                            /* Position cursor */
+      if (STRING_LENGTH <= 1)                                 /* String length <= 1 ? */
+        tft.setCursor(35, 155);                            /* Position cursor */
+      tft.print(CONVERTED);                                /* Display value */
+      tft.print(UNITDEG);
+
+
+      tft.setCursor(25, 185);                                /* Display cardinal info */
+      tft.print(gps.cardinal(gps.course.deg()) + String("  "));
+    }
+    COURSE_UPDATE_FLAG = false;                                  /* Set course update flag false */
+  }
+  else                                                        /* Not valid GPS altitude received ? */
+  {
+    if (COURSE_FAIL_UPDATE == true)                              /* Update needed ? */
+    {
+      tft.setTextSize(3);                                  /* Set text size to 3 */
+      tft.fillRect(4, 145, 100, 40, 0x1E9F);               /* Clear old altitude value */
+      tft.setCursor(18, 155);                              /* Position cursor */
+      tft.print("---" + String(UNITDEG));                                 /* Display course placeholder */
+
+      tft.setCursor(25, 185);
+      tft.print("---");   /* Display cardinal placeholder */
+    }
+    COURSE_FAIL_UPDATE = false;                                  /* Set altitude update false */
+  }
+}
+
+
+
+
+
 
 
 /****************************************************************************************/
@@ -745,38 +797,22 @@ void SUB_DISPLAY_MAIN (void)
   tft.setCursor(10, 7);                                    /* Display header info */
   tft.print("GPS Logger");
   tft.setCursor(210, 7);
-  tft.print("@PT 2019");
+  tft.print("@SailUI");
 
-  if (MENU_LANGUAGE == 0)                                     /* German language chosen ? */
-  {
-    tft.setCursor(5, 40);                                  /* Display degree of lattitude */
-    tft.print("Breiten-");
-    tft.setCursor(5, 65);
-    tft.print("grad");
-    tft.setCursor(5, 94);                                  /* Display degree of longitude */
-    tft.print("Laengen-");
-    tft.setCursor(5, 119);
-    tft.print("grad");
-    tft.setCursor(25, 185);                                /* Display elevation info */
-    tft.print("Hoehe");
-    tft.setCursor(125, 185);                               /* Display hspeed info */
-    tft.print("Gesch.");
-  }
-  else                                                        /*Englishn language chosen ? */
-  {
-    tft.setCursor(5, 40);                                  /* Display degree of lattitude */
-    tft.print("Degree");
-    tft.setCursor(5, 65);
-    tft.print("of Lat.");
-    tft.setCursor(5, 94);                                  /* Display degree of longitude */
-    tft.print("Degree");
-    tft.setCursor(5, 119);
-    tft.print("of Long.");
-    tft.setCursor(25, 185);                                /* Display altitude info */
-    tft.print("Alti.");
-    tft.setCursor(125, 185);                               /* Display hspeed info */
-    tft.print("Speed");
-  }
+
+  tft.setCursor(5, 40);                                  /* Display degree of lattitude */
+  tft.print("Degree");
+  tft.setCursor(5, 65);
+  tft.print("of Lat.");
+  tft.setCursor(5, 94);                                  /* Display degree of longitude */
+  tft.print("Degree");
+  tft.setCursor(5, 119);
+  tft.print("of Long.");
+  //tft.setCursor(25, 185);                                /* Display altitude info */
+  //tft.print("Alti.");
+  tft.setCursor(125, 185);                               /* Display hspeed info */
+  tft.print("Speed");
+
 
   tft.setCursor(215, 155);                                 /* Display number of sattelites */
   tft.println(" Sat.");
@@ -785,16 +821,10 @@ void SUB_DISPLAY_MAIN (void)
   tft.setTextSize(3);                                      /* Set text size to 3 */
   tft.setCursor(295, 50);                                  /* Display North info */
   tft.print("N");
-  if (MENU_LANGUAGE == 0)                                     /* German language chosen ? */
-  {
-    tft.setCursor(295, 104);                               /* Display East info */
-    tft.print("O");
-  }
-  else                                                        /* Englishn language chosen ? */
-  {
-    tft.setCursor(295, 104);                               /* Display East info */
-    tft.print("E");
-  }
+
+  tft.setCursor(295, 104);                               /* Display East info */
+  tft.print("E");
+
 }
 
 /****************************************************************************************/
@@ -808,20 +838,12 @@ void SUB_DISPLAY_NO_REC (void)
   tft.fillRect(0, 210, 320, 30, 0x439);                    /* Lower dark blue area */
   tft.setTextSize(3);                                      /* Set text size to 3 */
   tft.setTextColor(ILI9341_WHITE);                                 /* Set text color to white */
-  if (MENU_LANGUAGE == 0)                                     /* German language chosen ? */
-  {
-    tft.setCursor(80, 80);                                 /* Display message */
-    tft.print(F("Kein GPS!"));
-    tft.setCursor(40, 120);
-    tft.print(F("Pruefe Modul!"));
-  }
-  else                                                        /* Englishn language chosen ? */
-  {
-    tft.setCursor(100, 80);                                /* Display message */
-    tft.print(F("No GPS!"));
-    tft.setCursor(40, 120);
-    tft.print(F("Check module!"));
-  }
+
+  tft.setCursor(100, 80);                                /* Display message */
+  tft.print(F("No GPS!"));
+  tft.setCursor(40, 120);
+  tft.print(F("Check module!"));
+
 }
 
 
@@ -894,20 +916,11 @@ void SUB_DISPLAY_NO_GPS (void)
   tft.fillRect(0, 210, 320, 30, 0x439);                    /* Lower dark blue area */
   tft.setTextSize(3);                                      /* Set text size to 3 */
   tft.setTextColor(ILI9341_WHITE);                                 /* Set text color to white */
-  if (MENU_LANGUAGE == 0)                                     /* German language chosen ? */
-  {
-    tft.setCursor(40, 80);                                 /* Display message */
-    tft.print(F("Kein valides"));
-    tft.setCursor(50, 120);
-    tft.print(F("GPS Signal!"));
-  }
-  else                                                        /* Englishn language chosen ? */
-  {
-    tft.setCursor(70, 80);                                 /* Display message */
-    tft.print(F("No valid"));
-    tft.setCursor(50, 120);
-    tft.print(F("GPS signal!"));
-  }
+
+  tft.setCursor(70, 80);                                 /* Display message */
+  tft.print(F("No valid"));
+  tft.setCursor(50, 120);
+  tft.print(F("GPS signal!"));
 }
 
 /****************************************************************************************/
@@ -974,5 +987,15 @@ void displayInfo()
     Serial.print(F("INVALID"));
   }
 
-  Serial.println();
+  Serial.print(F(" "));
+  if (gps.course.isValid())
+  {
+    Serial.print(gps.course.deg());
+    Serial.print(F("° "));
+    Serial.print(gps.cardinal(gps.course.deg()));
+  }
+  else
+  {
+    Serial.print(F("INVALID"));
+  }
 }
