@@ -150,6 +150,7 @@ void loop() {
     }
     if (UPDATE_FLAG == true)                                  /* Update flag true ? */
     {
+      client.stop();
       SUB_DISPLAY_NO_REC();                                   /* Call sub routine to display no receiver error message */
       UPDATE_FLAG = false;                                    /* Set update flag false */
     }
